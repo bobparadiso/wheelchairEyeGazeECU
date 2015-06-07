@@ -1,0 +1,118 @@
+﻿//-----------------------------------------------------------------------
+// Copyright 2014 Tobii Technology AB. All rights reserved.
+//-----------------------------------------------------------------------
+
+using Tobii.EyeX.Client;
+using Tobii.EyeX.Framework;
+
+/// <summary>
+/// Accesses and monitors engine states.
+/// Used by the EyeXHost.
+/// </summary>
+/// <typeparam name="T">Data type of the engine state.</typeparam>
+internal class EyeXEngineStateAccessor<T>
+{
+    private readonly string _statePath;
+    private readonly AsyncDataHandler _handler;
+    private EyeXEngineStateValue<T> _currentValue;
+    private bool _isInitialized;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EyeXEngineStateAccessor{T}"/> class.
+    /// </summary>
+    /// <param name="statePath">The state path.</param>
+    public EyeXEngineStateAccessor(string statePath)
+    {
+        _statePath = statePath;
+        _handler = OnStateChanged;
+    }
+
+    /// <summary>
+    /// Gets the current value of the engine state.
+    /// </summary>
+    /// <param name="context">The interaction context.</param>
+    /// <returns>The state value.</returns>
+    public EyeXEngineStateValue<T> GetCurrentValue(Context context)
+    {
+        if (_currentValue == null)
+        {
+            // This is the first time someone asks for the current value.
+            // We don't have a value yet, but we'll make sure we get one.
+            _currentValue = EyeXEngineStateValue<T>.Invalid;
+            
+            // Register the state changed handler.
+            RegisterStateChangedHandler(context);
+        }
+
+        return _currentValue;
+    }
+
+    /// <summary>
+    /// Registers a listener for state-changed events.
+    /// </summary>
+    /// <param name="context">The interaction context.</param>
+    private void RegisterStateChangedHandler(Context context)
+    {
+        if (!_isInitialized && context != null)
+        {
+            // When the first event listener is registered: register a state-changed handler with the context.
+            context.RegisterStateChangedHandler(_statePath, _handler);
+            context.GetStateAsync(_statePath, _handler);
+
+            // We're now initialized.
+            _isInitialized = true;
+        }        
+    }
+
+    /// <summary>
+    /// Method to be invoked when a connection to the EyeX Engine has been established.
+    /// </summary>
+    /// <param name="context">The interaction context.</param>
+    public void OnConnected(Context context)
+    {
+        if (_isInitialized)
+        {
+            // When connected: send a request for the initial state.
+            context.GetStateAsync(_statePath, _handler);   
+        }
+    }
+
+    /// <summary>
+    /// Method to be invoked when the connection to the EyeX Engine has been lost.
+    /// </summary>
+    public void OnDisconnected()
+    {
+        if (_isInitialized)
+        {
+            // When disconnected: raise a state-changed event marking the state as invalid.
+            _currentValue = EyeXEngineStateValue<T>.Invalid;
+        }
+    }
+
+    private void OnStateChanged(AsyncData data)
+    {
+        using (data)
+        {
+            ResultCode resultCode;
+            if (!data.TryGetResultCode(out resultCode) || resultCode != ResultCode.Ok)
+            {
+                return;
+            }
+
+            using (var stateBag = data.GetDataAs<StateBag>())
+            {
+                if (stateBag != null)
+                {
+                    if (_isInitialized)
+                    {
+                        T value;
+                        if (stateBag.TryGetStateValue(out value, _statePath))
+                        {
+                            _currentValue = new EyeXEngineStateValue<T>(value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
