@@ -41,11 +41,25 @@ public class UnityArduino : MonoBehaviour
 		
 		return false;
 	}
-	
+
+	//
+	void Awake()
+	{
+		DontDestroyOnLoad(transform.gameObject);
+	}
+
 	// Use this for initialization
 	void Start () {
 		OpenSerialPort();
 		InvokeRepeating("SendControlData", 0, SEND_FREQUENCY);
+
+		Application.LoadLevel("drive");
+		UnityArduino.SendImmediate("1");
+	}
+
+	//
+	void OnDestroy() {
+		serial.Close();
 	}
 
 	public static void SetControlData(string data)
@@ -63,4 +77,9 @@ public class UnityArduino : MonoBehaviour
 		serial.Write(controlData);
 	}
 
+	//
+	public static void SendImmediate(string data)
+	{
+		serial.Write(data);
+	}
 }

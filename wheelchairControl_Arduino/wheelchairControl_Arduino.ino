@@ -1,5 +1,19 @@
 // Digital pin #2 is the same as Pin D2 see
 // http://arduino.cc/en/Hacking/PinMapping168 for the 'raw' pin mapping
+
+// Using the Adafruit Motor Shield v2:
+// http://www.adafruit.com/products/1438
+
+#include <Servo.h>
+#include <Wire.h>
+#include <Adafruit_MotorShield.h>
+
+#define MODE_NONE 0
+#define MODE_DRIVE 1
+#define MODE_ARM 2
+
+uint8_t controlMode = MODE_NONE;
+
 #define DATA_PIN_REG PIND
 #define DATA_DDR_REG DDRD
 #define DATA_PORT_REG PORTD
@@ -16,6 +30,28 @@
 #define RX_TIMEOUT 500
 
 char cmd_buf[LEN_CMD];
+
+#define ARM_REACH_MOTOR 1
+#define ARM_ELEVATION_MOTOR 2
+#define ARM_TURN_MOTOR 3
+
+#define CLAW_PIN 9
+#define CLAW_MIN 1600
+#define CLAW_MAX 2100
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
+Adafruit_DCMotor *armReachMotor = AFMS.getMotor(ARM_REACH_MOTOR);
+Adafruit_DCMotor *armElevationMotor = AFMS.getMotor(ARM_ELEVATION_MOTOR);
+Adafruit_DCMotor *armTurnMotor = AFMS.getMotor(ARM_TURN_MOTOR);
+
+Servo clawServo;
+int16_t clawPos;
+
+const uint8_t driveSpeed = 10;
+const uint16_t clawSpeed = 20;
+const uint8_t armSpeed = 255;
+
+uint32_t lastRx;
 
 char pow2(int p)
 {
@@ -107,7 +143,7 @@ void buildCmd(char *buf, char speed, char y, char x)
 //
 uint32_t lastTx;
 void send(const char *bits)
-{
+{  
   lastTx = millis();
   cli();
   DATA_DDR_REG |= (1 << DATA_PIN);
@@ -134,56 +170,188 @@ void send(const char *bits)
 }
 
 //
-void setup()
+void armOff()
 {
-  //setup wireless  
-  Serial.begin(115200); 
-  
-  //send start sequence
+  armReachMotor->run(RELEASE);
+  armElevationMotor->run(RELEASE);
+  armTurnMotor->run(RELEASE);
+}
+
+//
+void driveOff()
+{
+  buildCmd(cmd_buf, driveSpeed, 0, 0);
+
+  while (millis() - lastTx < DELAY_CMD);
+
+  //sending many times, just in case
+  for (int i = 0; i < 10; i++)
+  {
+    send(cmd_buf);
+    delay(DELAY_CMD);
+  }
+}
+
+//
+void allOff()
+{
+  driveOff();
+  armOff();
+}
+
+//
+void setClawPos(int16_t pos)
+{
+  clawPos = constrain(pos, CLAW_MIN, CLAW_MAX);
+  clawServo.writeMicroseconds(clawPos);
+}
+
+//
+void sendStartSequence()
+{
   for (int i = 0; i < 100; i++)
   {
     send(CMD_INIT);
     delay(DELAY_CMD);
   }
+}
+
+//
+boolean processCommonData(char rxData)
+{
+    switch (rxData)
+    {
+        case '1':
+          allOff();
+          controlMode = MODE_DRIVE;
+          sendStartSequence();
+          return true;   
+          
+        case '2':
+          allOff();
+          controlMode = MODE_ARM;
+          return true;
+          
+        default:
+          return false;
+    }
+}
+
+//
+void updateMode0()
+{
+  if (Serial.available())
+  {    
+    char rxData = Serial.read();
+    lastRx = millis();
+    if (processCommonData(rxData))
+      return;
+  }
+}
+
+//
+void updateDriveMode()
+{
+  if (Serial.available())
+  {    
+    char rxData = Serial.read();
+    lastRx = millis();
+    if (processCommonData(rxData))
+      return;
+      
+    switch (rxData)
+    {
+        //drive commands
+        case 'u': buildCmd(cmd_buf, driveSpeed, 100, 0); break;
+        case 'd': buildCmd(cmd_buf, driveSpeed, -100, 0); break;
+        case 'l': buildCmd(cmd_buf, driveSpeed, 0, -100); break;
+        case 'r': buildCmd(cmd_buf, driveSpeed, 0, 100); break;
+        
+        //in case Arduino terminal is used
+        case '\r':
+        case '\n':
+            break;
+        
+        //cut everything!
+        default:
+          allOff();
+          break;
+    }
+  }
   
-  char speed = 10;
+  if (millis() - lastTx > DELAY_CMD)
+    send(cmd_buf);
+}
+
+//
+void updateArmMode()
+{
+  if (Serial.available())
+  {
+    char rxData = Serial.read();
+    lastRx = millis();
+    if (processCommonData(rxData))
+      return;
   
-  buildCmd(cmd_buf, speed, 0, 0);//init
+    switch (rxData)
+    {
+        //arm commands
+        case 'D': armElevationMotor->run(FORWARD); break;
+        case 'U': armElevationMotor->run(BACKWARD); break;
+        case 'L': armTurnMotor->run(FORWARD); break;
+        case 'R': armTurnMotor->run(BACKWARD); break;
+        case 'B': armReachMotor->run(FORWARD); break;
+        case 'F': armReachMotor->run(BACKWARD); break;
+      
+        //claw commands
+        case 'O': setClawPos(clawPos - clawSpeed); break;
+        case 'C': setClawPos(clawPos + clawSpeed); break;
+            
+        //in case Arduino terminal is used
+        case '\r':
+        case '\n':
+            break;
+        
+        //cut everything!
+        default:
+          allOff();
+          break;
+    }
+  }
+}
+
+//
+void setup()
+{
+  //setup wireless  
+  Serial.begin(115200); 
   
-  //process wireless commands
-  uint32_t lastRx;
-  char ud, lr;
+  AFMS.begin();
+  armReachMotor->run(RELEASE);
+  armReachMotor->setSpeed(armSpeed);
+  armElevationMotor->run(RELEASE);
+  armElevationMotor->setSpeed(armSpeed);
+  armTurnMotor->run(RELEASE);
+  armTurnMotor->setSpeed(armSpeed);
+  
+  clawServo.attach(CLAW_PIN);
+  setClawPos(CLAW_MAX);//open
+      
+  buildCmd(cmd_buf, driveSpeed, 0, 0);//init
+  
+  //process commands
   while (1)
   {
-    if (Serial.available())
+    switch (controlMode)
     {
-      char rxData = Serial.read();
-
-      switch (rxData)
-      {
-          case 'u': buildCmd(cmd_buf, speed, 100, 0); break;
-          case 'd': buildCmd(cmd_buf, speed, -100, 0); break;
-          case 'l': buildCmd(cmd_buf, speed, 0, -100); break;
-          case 'r': buildCmd(cmd_buf, speed, 0, 100); break;
-          case '\r':
-          case '\n':
-              break;
-          default: buildCmd(cmd_buf, speed, 0, 0); break;
-      }
-
-      lastRx = millis();
+      case 1: updateDriveMode(); break;
+      case 2: updateArmMode(); break;
+      default: updateMode0(); break;
     }
-
-    //disable motor
+    
+    //cut everything
     if (millis() - lastRx > RX_TIMEOUT)
-    {
-        buildCmd(cmd_buf, speed, 0, 0);
-    }   
-
-    if (millis() - lastTx > DELAY_CMD)
-    {
-      send(cmd_buf);
-    }
+      allOff();
   }
   
   while (1) {}

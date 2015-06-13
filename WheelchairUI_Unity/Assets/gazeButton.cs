@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 
-public class gazeSwitch : MonoBehaviour 
+public class gazeButton : MonoBehaviour 
 {
-	const float ACTIVATE_THRESHOLD = 1.5f;
+	const float ACTIVATE_THRESHOLD = 3.0f;
 	const float TIME_NOT_SET = -1.0f;
 
 	private Transform _bgTransform;
@@ -12,7 +12,8 @@ public class gazeSwitch : MonoBehaviour
 
 	private float lastGazeTime = TIME_NOT_SET;
 
-	public string controlData = ".";
+	public string targetScene = "";
+	public string targetMode = "";
 	
 	void Start () 
 	{
@@ -43,7 +44,6 @@ public class gazeSwitch : MonoBehaviour
 		}
 		else if (lastGazeTime != TIME_NOT_SET)
 		{
-			UnityArduino.SetControlData(UnityArduino.CONTROL_STOP);
 			lastGazeTime = TIME_NOT_SET;
 		}
 
@@ -55,7 +55,8 @@ public class gazeSwitch : MonoBehaviour
 		else
 		{
 			_bgSpriteRenderer.color = Color.green;
-			UnityArduino.SetControlData(controlData);
+			Application.LoadLevel(targetScene);
+			UnityArduino.SendImmediate(targetMode);
 		}
 	}
 }
