@@ -11,6 +11,7 @@
 #define MODE_NONE 0
 #define MODE_DRIVE 1
 #define MODE_ARM 2
+#define MODE_POWER 3
 
 uint8_t controlMode = MODE_NONE;
 
@@ -20,6 +21,10 @@ uint8_t controlMode = MODE_NONE;
 #define DATA_PIN 2
 #define BIT_WIDTH 26 //uS
 #define DELAY_CMD 8 //ms
+
+#define POWER1_PIN 5
+#define POWER2_PIN 6
+#define POWER3_PIN 7
 
 #define NUM_PACKETS 6
 #define LEN_PACKET (3+8+1)
@@ -34,22 +39,20 @@ char cmd_buf[LEN_CMD];
 #define ARM_REACH_MOTOR 1
 #define ARM_ELEVATION_MOTOR 2
 #define ARM_TURN_MOTOR 3
-
-#define CLAW_PIN 9
-#define CLAW_MIN 1600
-#define CLAW_MAX 2100
+#define ARM_CLAW_MOTOR 4
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
 Adafruit_DCMotor *armReachMotor = AFMS.getMotor(ARM_REACH_MOTOR);
 Adafruit_DCMotor *armElevationMotor = AFMS.getMotor(ARM_ELEVATION_MOTOR);
 Adafruit_DCMotor *armTurnMotor = AFMS.getMotor(ARM_TURN_MOTOR);
-
-Servo clawServo;
-int16_t clawPos;
+Adafruit_DCMotor *armClawMotor = AFMS.getMotor(ARM_CLAW_MOTOR);
 
 const uint8_t driveSpeed = 10;
-const uint16_t clawSpeed = 20;
-const uint8_t armSpeed = 255;
+
+const uint8_t armClawSpeed = 32;
+const uint8_t armTurnSpeed = 64;
+const uint8_t armElevationSpeed = 96;
+const uint8_t armReachSpeed = 128;
 
 uint32_t lastRx;
 
@@ -175,6 +178,7 @@ void armOff()
   armReachMotor->run(RELEASE);
   armElevationMotor->run(RELEASE);
   armTurnMotor->run(RELEASE);
+  armClawMotor->run(RELEASE);
 }
 
 //
@@ -200,13 +204,6 @@ void allOff()
 }
 
 //
-void setClawPos(int16_t pos)
-{
-  clawPos = constrain(pos, CLAW_MIN, CLAW_MAX);
-  clawServo.writeMicroseconds(clawPos);
-}
-
-//
 void sendStartSequence()
 {
   for (int i = 0; i < 100; i++)
@@ -221,6 +218,11 @@ boolean processCommonData(char rxData)
 {
     switch (rxData)
     {
+        case '0':
+          allOff();
+          controlMode = MODE_NONE;
+          return true;   
+
         case '1':
           allOff();
           controlMode = MODE_DRIVE;
@@ -230,6 +232,11 @@ boolean processCommonData(char rxData)
         case '2':
           allOff();
           controlMode = MODE_ARM;
+          return true;
+
+        case '3':
+          allOff();
+          controlMode = MODE_POWER;
           return true;
           
         default:
@@ -298,14 +305,50 @@ void updateArmMode()
         //arm commands
         case 'D': armElevationMotor->run(FORWARD); break;
         case 'U': armElevationMotor->run(BACKWARD); break;
-        case 'L': armTurnMotor->run(FORWARD); break;
-        case 'R': armTurnMotor->run(BACKWARD); break;
+        case 'L': armTurnMotor->run(BACKWARD); break;
+        case 'R': armTurnMotor->run(FORWARD); break;
         case 'B': armReachMotor->run(FORWARD); break;
         case 'F': armReachMotor->run(BACKWARD); break;
-      
-        //claw commands
-        case 'O': setClawPos(clawPos - clawSpeed); break;
-        case 'C': setClawPos(clawPos + clawSpeed); break;
+        case 'C': armClawMotor->run(FORWARD); break;
+        case 'O': armClawMotor->run(BACKWARD); break;
+            
+        //in case Arduino terminal is used
+        case '\r':
+        case '\n':
+            break;
+        
+        //cut everything!
+        default:
+          allOff();
+          break;
+    }
+  }
+}
+
+//
+void pulsePowerPin(uint8_t pin)
+{
+  digitalWrite(pin, HIGH);
+  delay(500);
+  digitalWrite(pin, LOW);
+}
+
+//
+void updatePowerMode()
+{
+  if (Serial.available())
+  {
+    char rxData = Serial.read();
+    lastRx = millis();
+    if (processCommonData(rxData))
+      return;
+  
+    switch (rxData)
+    {
+        //arm commands
+        case 'x': pulsePowerPin(POWER1_PIN); break;
+        case 'y': pulsePowerPin(POWER2_PIN); break;
+        case 'z': pulsePowerPin(POWER3_PIN); break;
             
         //in case Arduino terminal is used
         case '\r':
@@ -324,18 +367,22 @@ void updateArmMode()
 void setup()
 {
   //setup wireless  
-  Serial.begin(115200); 
+  Serial.begin(115200);
+  Serial.println("ready");
+  
+  pinMode(POWER1_PIN, OUTPUT);
+  pinMode(POWER2_PIN, OUTPUT);
+  pinMode(POWER3_PIN, OUTPUT);
   
   AFMS.begin();
   armReachMotor->run(RELEASE);
-  armReachMotor->setSpeed(armSpeed);
+  armReachMotor->setSpeed(armReachSpeed);
   armElevationMotor->run(RELEASE);
-  armElevationMotor->setSpeed(armSpeed);
+  armElevationMotor->setSpeed(armElevationSpeed);
   armTurnMotor->run(RELEASE);
-  armTurnMotor->setSpeed(armSpeed);
-  
-  clawServo.attach(CLAW_PIN);
-  setClawPos(CLAW_MAX);//open
+  armTurnMotor->setSpeed(armTurnSpeed);
+  armClawMotor->run(RELEASE);
+  armClawMotor->setSpeed(armTurnSpeed);
       
   buildCmd(cmd_buf, driveSpeed, 0, 0);//init
   
@@ -346,6 +393,7 @@ void setup()
     {
       case 1: updateDriveMode(); break;
       case 2: updateArmMode(); break;
+      case 3: updatePowerMode(); break;
       default: updateMode0(); break;
     }
     

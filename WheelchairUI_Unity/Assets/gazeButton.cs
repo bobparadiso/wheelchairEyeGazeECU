@@ -4,6 +4,7 @@ public class gazeButton : MonoBehaviour
 {
 	const float ACTIVATE_THRESHOLD = 3.0f;
 	const float TIME_NOT_SET = -1.0f;
+	const float COOL_DOWN_DURATION = 0.5f;
 
 	private Transform _bgTransform;
 	private SpriteRenderer _bgSpriteRenderer;
@@ -11,9 +12,10 @@ public class gazeButton : MonoBehaviour
 	private GazeAwareComponent _bgGazeAware;
 
 	private float lastGazeTime = TIME_NOT_SET;
+	private float lastActivateTime = TIME_NOT_SET;
 
 	public string targetScene = "";
-	public string targetMode = "";
+	public string controlData = "";
 	
 	void Start () 
 	{
@@ -35,6 +37,18 @@ public class gazeButton : MonoBehaviour
 				hasGaze = true;
 		}
 
+		if (lastActivateTime != TIME_NOT_SET)
+		{
+			if (Time.time - lastActivateTime < COOL_DOWN_DURATION)
+			{
+				hasGaze = false;
+			}
+			else
+			{
+				lastActivateTime = TIME_NOT_SET;
+			}
+		}
+
 		//update gaze time
 		if (hasGaze)
 		{
@@ -49,14 +63,29 @@ public class gazeButton : MonoBehaviour
 
 		//respond to gaze time
 		if (lastGazeTime == TIME_NOT_SET)
-			_bgSpriteRenderer.color = Color.red;
+		{
+			if (lastActivateTime == TIME_NOT_SET)
+				_bgSpriteRenderer.color = Color.red;
+			else
+				_bgSpriteRenderer.color = Color.green;
+		}
 		else if (Time.time - lastGazeTime < ACTIVATE_THRESHOLD)
 			_bgSpriteRenderer.color = Color.yellow;
 		else
 		{
 			_bgSpriteRenderer.color = Color.green;
-			Application.LoadLevel(targetScene);
-			UnityArduino.SendImmediate(targetMode);
+			if (targetScene != "")
+			{
+				Application.LoadLevel(targetScene);
+				if (targetScene == "drive" || targetScene == "arm")
+					UnityArduino.SetStreamControlData(true);
+				else
+					UnityArduino.SetStreamControlData(false);
+			}
+			if (controlData != "")
+				UnityArduino.SendImmediate(controlData);
+
+			lastActivateTime = Time.time;
 		}
 	}
 }

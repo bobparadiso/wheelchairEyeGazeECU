@@ -13,6 +13,8 @@ public class UnityArduino : MonoBehaviour
 	static string controlData = CONTROL_STOP;
 	static float lastDataUpdate = 0.0f;
 
+	static bool streamControlData = false;
+
 	//
 	static bool OpenSerialPort()
 	{
@@ -55,13 +57,22 @@ public class UnityArduino : MonoBehaviour
 
 		Application.LoadLevel("drive");
 		UnityArduino.SendImmediate("1");
+		UnityArduino.SetStreamControlData(true);
 	}
 
 	//
 	void OnDestroy() {
+		SendImmediate("0");
 		serial.Close();
 	}
 
+	//
+	public static void SetStreamControlData(bool enable)
+	{
+		streamControlData = enable;
+	}
+
+	//
 	public static void SetControlData(string data)
 	{
 		controlData = data;
@@ -71,15 +82,20 @@ public class UnityArduino : MonoBehaviour
 	//
 	void SendControlData()
 	{
-		if (Time.time - lastDataUpdate > DATA_TIMEOUT)
-			controlData = CONTROL_STOP;
+		if (streamControlData)
+		{
+			if (Time.time - lastDataUpdate > DATA_TIMEOUT)
+				controlData = CONTROL_STOP;
 
-		serial.Write(controlData);
+			serial.Write(controlData);
+			serial.BaseStream.Flush();
+		}
 	}
 
 	//
 	public static void SendImmediate(string data)
 	{
 		serial.Write(data);
+		serial.BaseStream.Flush();
 	}
 }
