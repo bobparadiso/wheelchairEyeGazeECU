@@ -34,7 +34,7 @@ uint8_t controlMode = MODE_NONE;
 
 #define RX_TIMEOUT 500
 
-char cmd_buf[LEN_CMD];
+char driveCmdBuf[LEN_CMD];
 
 #define ARM_REACH_MOTOR 1
 #define ARM_ELEVATION_MOTOR 2
@@ -56,6 +56,167 @@ const uint8_t armReachSpeed = 128;
 
 uint32_t lastRx;
 
+int IRsignal_power[] = {
+	9076, 4520,
+	564, 1676,
+	592, 568,
+	536, 568,
+	564, 556,
+	568, 564,
+	540, 564,
+	568, 560,
+	564, 568,
+	544, 560,
+	564, 1708,
+	540, 1680,
+	588, 1656,
+	592, 1680,
+	568, 1680,
+	588, 1656,
+	592, 1684,
+	564, 1680,
+	588, 544,
+	568, 1676,
+	592, 1656,
+	592, 1680,
+	568, 564,
+	572, 556,
+	564, 568,
+	536, 568,
+	564, 1680,
+	568, 564,
+	568, 560,
+	564, 568,
+	544, 1676,
+	592, 1652,
+	596, 1676,
+	572, 40220,
+	9072, 2236,
+	588, 0};
+
+int IRsignal_volUp[] = {
+	9076, 4512,
+	572, 1676,
+	624, 532,
+	540, 564,
+	568, 536,
+	616, 540,
+	544, 560,
+	572, 532,
+	624, 508,
+	564, 564,
+	568, 1680,
+	568, 1676,
+	624, 1624,
+	592, 1680,
+	568, 1676,
+	624, 1624,
+	592, 1680,
+	568, 564,
+	572, 1672,
+	564, 1684,
+	616, 1628,
+	596, 564,
+	592, 508,
+	572, 560,
+	564, 540,
+	624, 1620,
+	600, 560,
+	592, 512,
+	572, 556,
+	564, 1684,
+	564, 1680,
+	620, 1628,
+	588, 1684,
+	564, 40228,
+	9064, 2240,
+	596, 0};
+
+int IRsignal_volDown[] = {
+	9072, 4516,
+	572, 1676,
+	592, 564,
+	536, 568,
+	568, 560,
+	572, 560,
+	544, 560,
+	572, 560,
+	564, 564,
+	536, 568,
+	568, 1680,
+	568, 1676,
+	592, 1656,
+	596, 1680,
+	564, 1680,
+	588, 1652,
+	588, 1684,
+	564, 568,
+	568, 560,
+	560, 1660,
+	588, 1684,
+	564, 568,
+	568, 560,
+	572, 560,
+	544, 560,
+	572, 1672,
+	564, 1684,
+	596, 560,
+	544, 560,
+	572, 1672,
+	564, 1684,
+	596, 1648,
+	600, 1676,
+	572, 40220,
+	9068, 2236,
+	592, 0};
+
+#define IR_FREQ 38 //kHz
+
+//digital pin 12
+#define IRledPin_PORT PORTB
+#define IRledPin 4
+
+// This procedure sends a xKHz pulse to the IRledPin 
+// for a certain # of microseconds. We'll use this whenever we need to send codes
+void pulseIR(long microsecs)
+{
+  // we'll count down from the number of microseconds we are told to wait
+ 
+  int waveLength = 1000 / IR_FREQ;
+  int halfWaveLength = waveLength / 2;
+  //Serial.println(waveLength);
+ 
+  cli();  // this turns off any background interrupts
+
+  while (microsecs > 0)
+  {
+   IRledPin_PORT |= _BV(IRledPin);
+   delayMicroseconds(halfWaveLength);
+   IRledPin_PORT &= ~_BV(IRledPin);
+   delayMicroseconds(halfWaveLength);
+   
+   microsecs -= waveLength;
+  }
+ 
+  sei();  // this turns them back on
+}
+
+// 
+void SendIRCode(const int *code)
+{
+  const int *pulse = code;
+  while (true)
+  {
+    int on = *(pulse++);
+    int off = *(pulse++);
+    pulseIR(on);
+    delayMicroseconds(off);
+    if (off == 0)
+      return;
+  }
+}
+
+//
 char pow2(int p)
 {
   int retval = 1;
@@ -90,7 +251,7 @@ void stringToChar(const char *string, char &val)
 //example:
 //    start          horn           speed[4]       y              x              checksum     
 //110 01010010 1 110 10000000 1 110 11100000 1 110 00101011 0 110 01000000 1 110 11101011 0 
-void buildCmd(char *buf, char speed, char y, char x)
+void buildDriveCmd(char *buf, char speed, char y, char x)
 {
   char tmp[8];
   
@@ -145,7 +306,7 @@ void buildCmd(char *buf, char speed, char y, char x)
 
 //
 uint32_t lastTx;
-void send(const char *bits)
+void sendDriveCmd(const char *bits)
 {  
   lastTx = millis();
   cli();
@@ -184,14 +345,14 @@ void armOff()
 //
 void driveOff()
 {
-  buildCmd(cmd_buf, driveSpeed, 0, 0);
+  buildDriveCmd(driveCmdBuf, driveSpeed, 0, 0);
 
   while (millis() - lastTx < DELAY_CMD);
 
   //sending many times, just in case
   for (int i = 0; i < 10; i++)
   {
-    send(cmd_buf);
+    sendDriveCmd(driveCmdBuf);
     delay(DELAY_CMD);
   }
 }
@@ -208,7 +369,7 @@ void sendStartSequence()
 {
   for (int i = 0; i < 100; i++)
   {
-    send(CMD_INIT);
+    sendDriveCmd(CMD_INIT);
     delay(DELAY_CMD);
   }
 }
@@ -269,10 +430,10 @@ void updateDriveMode()
     switch (rxData)
     {
         //drive commands
-        case 'u': buildCmd(cmd_buf, driveSpeed, 100, 0); break;
-        case 'd': buildCmd(cmd_buf, driveSpeed, -100, 0); break;
-        case 'l': buildCmd(cmd_buf, driveSpeed, 0, -100); break;
-        case 'r': buildCmd(cmd_buf, driveSpeed, 0, 100); break;
+        case 'u': buildDriveCmd(driveCmdBuf, driveSpeed, 100, 0); break;
+        case 'd': buildDriveCmd(driveCmdBuf, driveSpeed, -100, 0); break;
+        case 'l': buildDriveCmd(driveCmdBuf, driveSpeed, 0, -100); break;
+        case 'r': buildDriveCmd(driveCmdBuf, driveSpeed, 0, 100); break;
         
         //in case Arduino terminal is used
         case '\r':
@@ -287,7 +448,7 @@ void updateDriveMode()
   }
   
   if (millis() - lastTx > DELAY_CMD)
-    send(cmd_buf);
+    sendDriveCmd(driveCmdBuf);
 }
 
 //
@@ -345,11 +506,16 @@ void updatePowerMode()
   
     switch (rxData)
     {
-        //arm commands
+        //power commands
         case 'x': pulsePowerPin(POWER1_PIN); break;
         case 'y': pulsePowerPin(POWER2_PIN); break;
         case 'z': pulsePowerPin(POWER3_PIN); break;
             
+        //radio commands
+        case 'm': SendIRCode(IRsignal_power); break;
+        case 'n': SendIRCode(IRsignal_volUp); break;
+        case 'o': SendIRCode(IRsignal_volDown); break;
+
         //in case Arduino terminal is used
         case '\r':
         case '\n':
@@ -366,6 +532,9 @@ void updatePowerMode()
 //
 void setup()
 {
+  //IR setup
+  DDRB |= _BV(IRledPin);  
+  
   //setup wireless  
   Serial.begin(115200);
   Serial.println("ready");
@@ -384,7 +553,7 @@ void setup()
   armClawMotor->run(RELEASE);
   armClawMotor->setSpeed(armTurnSpeed);
       
-  buildCmd(cmd_buf, driveSpeed, 0, 0);//init
+  buildDriveCmd(driveCmdBuf, driveSpeed, 0, 0);//init
   
   //process commands
   while (1)
