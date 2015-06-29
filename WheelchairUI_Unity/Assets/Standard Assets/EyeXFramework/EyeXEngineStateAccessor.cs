@@ -28,6 +28,15 @@ internal class EyeXEngineStateAccessor<T>
     }
 
     /// <summary>
+    /// Gets the state path.
+    /// </summary>
+    /// <value>The state path.</value>
+    public string StatePath
+    {
+        get { return _statePath; }
+    }
+
+    /// <summary>
     /// Gets the current value of the engine state.
     /// </summary>
     /// <param name="context">The interaction context.</param>
@@ -89,6 +98,17 @@ internal class EyeXEngineStateAccessor<T>
         }
     }
 
+    /// <summary>
+    /// Gets the data from the state bag.
+    /// </summary>
+    /// <param name="bag">The bag.</param>
+    /// <param name="value">The value.</param>
+    /// <returns><c>true</c> if data could be retrieved; otherwise <c>false</c>.</returns>
+    protected virtual bool GetData(StateBag bag, out T value)
+    {
+        return bag.TryGetStateValue(out value, _statePath);
+    }
+
     private void OnStateChanged(AsyncData data)
     {
         using (data)
@@ -106,7 +126,7 @@ internal class EyeXEngineStateAccessor<T>
                     if (_isInitialized)
                     {
                         T value;
-                        if (stateBag.TryGetStateValue(out value, _statePath))
+                        if (GetData(stateBag, out value))
                         {
                             _currentValue = new EyeXEngineStateValue<T>(value);
                         }

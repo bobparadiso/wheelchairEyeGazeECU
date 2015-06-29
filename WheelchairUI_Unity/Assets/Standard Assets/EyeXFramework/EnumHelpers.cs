@@ -52,8 +52,38 @@ internal static class EnumHelpers
             case UserPresence.NotPresent:
                 return EyeXUserPresence.NotPresent;
 
+            // Unknown?
+            case UserPresence.Unknown:
+                return EyeXUserPresence.Unknown;
+
             default:
-                throw new InvalidOperationException("Unknown user presence value.");
+                throw new InvalidOperationException("Unrecognized user presence value.");
         }
+    }
+
+    public static EyeXGazeTracking ConvertToEyeXGazeTracking(EyeXHost host, EyeXEngineStateValue<GazeTracking> state)
+    {
+        if(host.EngineVersion == null || (host.EngineVersion != null && host.EngineVersion.Major >= 1 && host.EngineVersion.Minor >= 4))
+        {
+            if (state == null || !state.IsValid || state.Value == 0)
+            {
+                return EyeXGazeTracking.Unknown;
+            }
+
+            switch (state.Value)
+            {
+                // Gaze tracked?
+                case GazeTracking.GazeTracked:
+                    return EyeXGazeTracking.GazeTracked;
+
+                // Gaze not tracked?
+                case GazeTracking.GazeNotTracked:
+                    return EyeXGazeTracking.GazeNotTracked;
+
+                default:
+                    throw new InvalidOperationException("Unknown gaze tracking value.");
+            }
+        }
+        return EyeXGazeTracking.NotSupported;
     }
 }

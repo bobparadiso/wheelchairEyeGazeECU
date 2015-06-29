@@ -23,6 +23,11 @@ public class UserPresenceComponent : MonoBehaviour
     /// </summary>
     public bool IsUserPresent { get; private set; }
 
+	/// <summary>
+	/// Gets a value indicating whether the EyeX Engine is tracking the user's gaze.
+	/// </summary>
+	public EyeXGazeTracking GazeTracking { get; private set; }
+
     void Start()
     {
         _eyexHost = EyeXHost.GetInstance();
@@ -34,5 +39,6 @@ public class UserPresenceComponent : MonoBehaviour
 
         IsValid = userPresenceStateValue != EyeXUserPresence.Unknown;
         IsUserPresent = (userPresenceStateValue == EyeXUserPresence.Present);
+		GazeTracking = _eyexHost.GazeTracking;
     }
 }

@@ -52,11 +52,12 @@
             Exception used to forward non ok <see cref="T:Tobii.EyeX.Framework.ResultCode"/>s from the native API to the client.
             </summary>
         </member>
-        <member name="M:Tobii.EyeX.Client.InteractionApiException.#ctor(Tobii.EyeX.Framework.ResultCode)">
+        <member name="M:Tobii.EyeX.Client.InteractionApiException.#ctor(Tobii.EyeX.Framework.ResultCode,System.String)">
             <summary>
             Creates the exception with the specified <see cref="T:Tobii.EyeX.Framework.ResultCode"/>.
             </summary>
             <param name="result">The <see cref="T:Tobii.EyeX.Framework.ResultCode"/>.</param>
+            <param name="errorMessage">The error message.</param>
         </member>
         <member name="P:Tobii.EyeX.Client.InteractionApiException.Result">
             <summary>
@@ -237,6 +238,12 @@
             <summary>
             Gets the content data as <see cref="T:Tobii.EyeX.Client.InteractionObject"/> .
             May be null depending on the asynchronous operation.
+            </summary>
+        </member>
+        <member name="P:Tobii.EyeX.Client.AsyncData.ErrorMessage">
+            <summary>
+            Gets the error message of the <see cref="T:Tobii.EyeX.Client.AsyncData"/>
+            Will be null of no error message is available.
             </summary>
         </member>
         <member name="T:Tobii.EyeX.Client.Behavior">
@@ -609,6 +616,13 @@
             </summary>
             <returns>The <see cref="T:Tobii.EyeX.Client.Snapshot"/></returns>
         </member>
+        <member name="M:Tobii.EyeX.Client.Context.CreateWithGlobalInteractor(System.String,Tobii.EyeX.Client.Interactor@)">
+            <summary>
+            Creates a global interactor <see cref="T:Tobii.EyeX.Client.Snapshot"/>  /&gt;.
+            </summary>
+            <returns>The <see cref="T:Tobii.EyeX.Client.Snapshot"/>.</returns>
+            <exception cref="T:Tobii.EyeX.Client.InteractionApiException">Will be thrown with result <see cref="F:Tobii.EyeX.Framework.ResultCode.InvalidArgument"/> if an invalid argument was passed to the function.</exception>
+        </member>
         <member name="M:Tobii.EyeX.Client.Context.CreateSnapshotWithQueryBounds(Tobii.EyeX.Client.Query)">
             <summary>
             Creates a <see cref="T:Tobii.EyeX.Client.Snapshot"/> with the same <see cref="T:Tobii.EyeX.Client.Bounds"/> as those given by the specified <see cref="T:Tobii.EyeX.Client.Query"/>.
@@ -679,6 +693,22 @@
             Launch a configuration tool. 
             </summary>
             <param name="configurationTool">The configuartion tool to launch.</param>
+            <param name="completionHandler">The completion handler invoked when the response from the server arrives. Can be null.</param>
+            <exception cref="T:Tobii.EyeX.Client.InteractionApiException">Will be thrown on errors.</exception>
+        </member>
+        <member name="M:Tobii.EyeX.Client.Context.SetCurrentProfile(System.String,Tobii.EyeX.Client.AsyncDataHandler)">
+            <summary>
+            Set current profile. 
+            </summary>
+            <param name="profileName">The name of the profile to set as current profile.</param>
+            <param name="completionHandler">The completion handler invoked when the response from the server arrives. Can be null.</param>
+            <exception cref="T:Tobii.EyeX.Client.InteractionApiException">Will be thrown on errors.</exception>
+        </member>
+        <member name="M:Tobii.EyeX.Client.Context.DeleteProfile(System.String,Tobii.EyeX.Client.AsyncDataHandler)">
+            <summary>
+            Delete a profile. 
+            </summary>
+            <param name="profileName">The name of the profile to delete.</param>
             <param name="completionHandler">The completion handler invoked when the response from the server arrives. Can be null.</param>
             <exception cref="T:Tobii.EyeX.Client.InteractionApiException">Will be thrown on errors.</exception>
         </member>
@@ -907,13 +937,11 @@
             <param name="rowCount">The number of rows.</param>
             <param name="maskData">The data for the mask.</param>
             <returns>The <see cref="P:Tobii.EyeX.Client.Interactor.Mask"/>.</returns>
-            <exception cref="T:Tobii.EyeX.Client.InteractionApiException">Will be thrown with <see cref="F:Tobii.EyeX.Framework.ResultCode.DuplicateMask"/> if the interactor already has an <see cref="P:Tobii.EyeX.Client.Interactor.Mask"/>.</exception>
         </member>
         <member name="M:Tobii.EyeX.Client.Interactor.RemoveMask">
             <summary>
             Removes the <see cref="P:Tobii.EyeX.Client.Interactor.Mask"/> from the interactor.
             </summary>
-            <exception cref="T:Tobii.EyeX.Client.InteractionApiException">Will be thrown with <see cref="F:Tobii.EyeX.Framework.ResultCode.NotFound"/> if the interactor does not have an <see cref="P:Tobii.EyeX.Client.Interactor.Mask"/>.</exception>
         </member>
         <member name="M:Tobii.EyeX.Client.Interactor.CreateActivatableBehavior(Tobii.EyeX.Client.ActivatableParams@)">
             <summary>
@@ -1035,6 +1063,15 @@
             </summary>
             <typeparam name="TValue">The desired type.</typeparam>
             <returns>The value as the specified type.</returns>
+        </member>
+        <member name="M:Tobii.EyeX.Client.Property.GetValueAsEnumerable``1">
+            <summary>
+            Gets the value as an IEnumerable with values of a specified type.
+            The type must be compatible with at least one of the types specified by <see cref="T:Tobii.EyeX.Client.PropertyValueType"/>.
+            In case the value is not an IEnumerable or if specified type is not compatible with any of the <see cref="T:Tobii.EyeX.Client.PropertyValueType"/> an InvalidCast exception is thrown.
+            </summary>
+            <typeparam name="TValue">The desired type of the elements in enumerable.</typeparam>
+            <returns>An Ienumerable with the value as the specified type.</returns>
         </member>
         <member name="M:Tobii.EyeX.Client.Property.GetValueAs(System.Type)">
             <summary>
@@ -1188,6 +1225,16 @@
             </summary>
         </member>
         <member name="M:Tobii.EyeX.Client.StateBag.TryGetStateValue``1(``0@,System.String[])">
+            <summary>
+            Tries to get a value from a state bag.
+            The value will be converted to the specified TValue if applicable.
+            </summary>
+            <typeparam name="TValue">The desired type.</typeparam>
+            <param name="value">Out parameter for the value.</param>
+            <param name="path">The path to the state.</param>
+            <returns>True if the state was successfully retrieved, otherwise false.</returns>
+        </member>
+        <member name="M:Tobii.EyeX.Client.StateBag.TryGetStateValueAsEnumerable``1(System.Collections.Generic.IEnumerable{``0}@,System.String[])">
             <summary>
             Tries to get a value from a state bag.
             The value will be converted to the specified TValue if applicable.

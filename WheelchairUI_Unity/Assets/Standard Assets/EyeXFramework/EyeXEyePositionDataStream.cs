@@ -44,10 +44,10 @@ public class EyeXEyePositionDataStream : EyeXDataStreamBase<EyeXEyePosition>
             if (behavior.TryGetEyePositionDataEventParams(out eventParams))
             {
                 var left = new EyeXSingleEyePosition(eventParams.HasLeftEyePosition != EyeXBoolean.False, (float)eventParams.LeftEyeX, (float)eventParams.LeftEyeY, (float)eventParams.LeftEyeZ);
-                var leftNormalized = new EyeXSingleEyePosition(eventParams.HasLeftEyePosition != EyeXBoolean.False, (float)eventParams.LeftEyeXNormalized, (float)eventParams.LeftEyeYNormalized, (float)eventParams.LeftEyeZNormalized);
+				var leftNormalized = new EyeXSingleEyePosition(eventParams.HasLeftEyePosition != EyeXBoolean.False, (float)eventParams.LeftEyeXNormalized, (float)eventParams.LeftEyeYNormalized, (float)eventParams.LeftEyeZNormalized);
                 
-                var right = new EyeXSingleEyePosition(eventParams.HasRightEyePosition != EyeXBoolean.False, (float)eventParams.RightEyeX, (float)eventParams.RightEyeY, (float)eventParams.RightEyeZ);
-                var rightNormalized = new EyeXSingleEyePosition(eventParams.HasRightEyePosition != EyeXBoolean.False, (float)eventParams.RightEyeXNormalized, (float)eventParams.RightEyeYNormalized, (float)eventParams.RightEyeZNormalized);
+				var right = new EyeXSingleEyePosition(eventParams.HasRightEyePosition != EyeXBoolean.False, (float)eventParams.RightEyeX, (float)eventParams.RightEyeY, (float)eventParams.RightEyeZ);
+				var rightNormalized = new EyeXSingleEyePosition(eventParams.HasRightEyePosition != EyeXBoolean.False, (float)eventParams.RightEyeXNormalized, (float)eventParams.RightEyeYNormalized, (float)eventParams.RightEyeZNormalized);
 
                 Last = new EyeXEyePosition(left, leftNormalized, right, rightNormalized, eventParams.Timestamp);
             }

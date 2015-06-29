@@ -51,6 +51,7 @@ public partial class EyeXHost : MonoBehaviour
     private EyeXEngineStateAccessor<Size2> _displaySizeStateAccessor;
     private EyeXEngineStateAccessor<EyeTrackingDeviceStatus> _eyeTrackingDeviceStatusStateAccessor;
     private EyeXEngineStateAccessor<UserPresence> _userPresenceStateAccessor;
+	private EyeXEngineStateAccessor<GazeTracking> _gazeTracking;
 
     /// <summary>
     /// Gets the engine state: Screen bounds in pixels.
@@ -92,6 +93,19 @@ public partial class EyeXHost : MonoBehaviour
         }
     }
 
+	/// <summary>
+	/// Gets the engine state: Gaze tracking.
+	/// </summary>
+	/// <value>The gaze tracking.</value>
+	public EyeXGazeTracking GazeTracking
+	{
+		get 
+		{
+            return EnumHelpers.ConvertToEyeXGazeTracking(
+                this, _gazeTracking.GetCurrentValue(_context));
+		}
+	}
+
     /// <summary>
     /// Gets the engine version.
     /// </summary>
@@ -126,6 +140,10 @@ public partial class EyeXHost : MonoBehaviour
         get { return _context != null; }
     }
 
+	/// <summary>
+	/// Gets a value indicating whether the host is running.
+	/// </summary>
+	/// <value><c>true</c> if the host is running; otherwise, <c>false</c>.</value>
     private bool IsRunning
     {
         get
@@ -171,10 +189,13 @@ public partial class EyeXHost : MonoBehaviour
         _viewportBoundsProvider = new UnityPlayerViewportBoundsProvider();
 #endif
 
-        _screenBoundsStateAccessor = new EyeXEngineStateAccessor<Tobii.EyeX.Client.Rect>(StatePaths.ScreenBounds);
-        _displaySizeStateAccessor = new EyeXEngineStateAccessor<Size2>(StatePaths.DisplaySize);
+        _screenBoundsStateAccessor = new EyeXEngineStateAccessor<Tobii.EyeX.Client.Rect>(StatePaths.EyeTrackingScreenBounds);
+        _displaySizeStateAccessor = new EyeXEngineStateAccessor<Size2>(StatePaths.EyeTrackingDisplaySize);
         _eyeTrackingDeviceStatusStateAccessor = new EyeXEngineStateAccessor<EyeTrackingDeviceStatus>(StatePaths.EyeTrackingState);
         _userPresenceStateAccessor = new EyeXEngineStateAccessor<UserPresence>(StatePaths.UserPresence);
+        _userProfileNameStateAccessor = new EyeXEngineStateAccessor<string>(StatePaths.ProfileName);
+        _userProfileNamesStateAccessor = new EyeXEngineEnumerableStateAccessor<string>(StatePaths.EyeTrackingProfiles);
+		_gazeTracking = new EyeXEngineStateAccessor<GazeTracking>(StatePaths.GazeTracking);
     }
 
 #if UNITY_EDITOR
@@ -478,6 +499,9 @@ public partial class EyeXHost : MonoBehaviour
             _displaySizeStateAccessor.OnConnected(_context);
             _eyeTrackingDeviceStatusStateAccessor.OnConnected(_context);
             _userPresenceStateAccessor.OnConnected(_context);
+            _userProfileNameStateAccessor.OnConnected(_context);
+            _userProfileNamesStateAccessor.OnConnected(_context);
+			_gazeTracking.OnConnected(_context);
         }
         else
         {
@@ -487,6 +511,9 @@ public partial class EyeXHost : MonoBehaviour
             _displaySizeStateAccessor.OnDisconnected();
             _eyeTrackingDeviceStatusStateAccessor.OnDisconnected();
             _userPresenceStateAccessor.OnDisconnected();
+            _userProfileNameStateAccessor.OnDisconnected();
+            _userProfileNamesStateAccessor.OnDisconnected();
+			_gazeTracking.OnDisconnected();
         }
     }
 
@@ -696,6 +723,10 @@ public partial class EyeXHost : MonoBehaviour
         {
             throw new InvalidOperationException("The EyeX host has not been started.");
         }
+        if(_engineVersion != null)
+        {
+            return _engineVersion;
+        }
         var stateBag = _context.GetState(StatePaths.EngineVersion);
         string value;
         if (!stateBag.TryGetStateValue(out value, StatePaths.EngineVersion))
@@ -704,5 +735,4 @@ public partial class EyeXHost : MonoBehaviour
         }
         return new Version(value);
     }
-
 }

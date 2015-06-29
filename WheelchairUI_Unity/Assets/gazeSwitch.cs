@@ -3,6 +3,7 @@
 public class gazeSwitch : MonoBehaviour 
 {
 	const float ACTIVATE_THRESHOLD = 1.5f;
+	const float DEACTIVATE_THRESHOLD = 0.25f;
 	const float TIME_NOT_SET = -1.0f;
 
 	private Transform _bgTransform;
@@ -11,6 +12,7 @@ public class gazeSwitch : MonoBehaviour
 	private GazeAwareComponent _bgGazeAware;
 
 	private float lastGazeTime = TIME_NOT_SET;
+	private float lastBreakTime = TIME_NOT_SET;
 
 	public string controlData = ".";
 	
@@ -40,11 +42,25 @@ public class gazeSwitch : MonoBehaviour
 			_bgTransform.Rotate (Vector3.forward);
 			if (lastGazeTime == TIME_NOT_SET)
 				lastGazeTime = Time.time;
+			lastBreakTime = TIME_NOT_SET;
 		}
 		else if (lastGazeTime != TIME_NOT_SET)
 		{
-			UnityArduino.SetControlData(UnityArduino.CONTROL_STOP);
-			lastGazeTime = TIME_NOT_SET;
+			if (Time.time - lastGazeTime >= ACTIVATE_THRESHOLD)
+			{
+				if (lastBreakTime == TIME_NOT_SET)
+					lastBreakTime = Time.time;
+				else if (Time.time - lastBreakTime >= DEACTIVATE_THRESHOLD)
+				{
+					UnityArduino.SetControlData(UnityArduino.CONTROL_STOP);
+					lastGazeTime = TIME_NOT_SET;
+				}
+			}
+			else
+			{
+				UnityArduino.SetControlData(UnityArduino.CONTROL_STOP);
+				lastGazeTime = TIME_NOT_SET;
+			}
 		}
 
 		//respond to gaze time
