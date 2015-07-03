@@ -5,8 +5,11 @@ using System.IO;
 
 public class UnityArduino : MonoBehaviour
 {
+	const float TIME_NOT_SET = -1.0f;
 	const float SEND_FREQUENCY = 0.1f;
 	const float DATA_TIMEOUT = 0.5f;
+	const float GAZE_POINT_EXPIRATION = 0.1f;
+
 	public const string CONTROL_STOP = ".";
 
 	static SerialPort serial;
@@ -14,6 +17,13 @@ public class UnityArduino : MonoBehaviour
 	static float lastDataUpdate = 0.0f;
 
 	static bool streamControlData = false;
+
+	private GazePointDataComponent gazePointData;
+
+	private double lastGazePoint_Timestamp = TIME_NOT_SET;
+	private double lastGazePoint_Time = TIME_NOT_SET;
+
+	public static bool validGaze = false;
 
 	//
 	static bool OpenSerialPort()
@@ -52,12 +62,28 @@ public class UnityArduino : MonoBehaviour
 
 	// Use this for initialization
 	void Start () {
+		gazePointData = GetComponent<GazePointDataComponent>();
+
 		OpenSerialPort();
 		InvokeRepeating("SendControlData", 0, SEND_FREQUENCY);
 
 		Application.LoadLevel("drive");
 		UnityArduino.SendImmediate("1");
 		UnityArduino.SetStreamControlData(true);
+	}
+
+	//
+	void Update()
+	{
+		// Get the last gaze point and timing
+		var lastGazePoint =	gazePointData.LastGazePoint;
+		if (lastGazePoint.IsValid && lastGazePoint.IsWithinScreenBounds &&
+		    lastGazePoint.Timestamp != lastGazePoint_Timestamp)
+		{
+			lastGazePoint_Timestamp = lastGazePoint.Timestamp;
+			lastGazePoint_Time = Time.time;
+		}
+		validGaze = lastGazePoint_Time != TIME_NOT_SET && Time.time - lastGazePoint_Time < GAZE_POINT_EXPIRATION;
 	}
 
 	//
